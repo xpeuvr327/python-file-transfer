@@ -8,54 +8,52 @@ and HEAD requests in a fairly straightforward manner.
 
 see: https://gist.github.com/UniIsland/3346170
 """
- 
- 
+
 __version__ = "0.1"
 __all__ = ["SimpleHTTPRequestHandler"]
 __author__ = "bones7456"
 __home_page__ = "http://li2z.cn/"
- 
+
 import os
 import posixpath
 import http.server
 import urllib.request, urllib.parse, urllib.error
-import cgi
+import html
 import shutil
 import mimetypes
 import re
 from io import BytesIO
- 
 import socket
- 
+
 class SimpleHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
- 
+
     """Simple HTTP request handler with GET/HEAD/POST commands.
 
     This serves files from the current directory and any of its
     subdirectories.  The MIME type for files is determined by
-    calling the .guess_type() method. And can reveive file uploaded
+    calling the .guess_type() method. And can receive file uploaded
     by client.
 
     The GET/HEAD/POST requests are identical except that the HEAD
     request omits the actual contents of the file.
 
     """
- 
+
     server_version = "SimpleHTTPWithUpload/" + __version__
- 
+
     def do_GET(self):
         """Serve a GET request."""
         f = self.send_head()
         if f:
             self.copyfile(f, self.wfile)
             f.close()
- 
+
     def do_HEAD(self):
         """Serve a HEAD request."""
         f = self.send_head()
         if f:
             f.close()
- 
+
     def do_POST(self):
         """Serve a POST request."""
         r, info = self.deal_post_data()
@@ -71,9 +69,6 @@ class SimpleHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
             f.write(b"<strong>Failed:</strong>")
         f.write(info.encode())
         f.write(("<br><a href=\"%s\">back</a>" % self.headers['referer']).encode())
-        #f.write(b"<hr><small>Powerd By: bones7456, check new version at ")
-        #f.write(b"<a href=\"http://li2z.cn/?s=SimpleHTTPServerWithUpload\">")
-        #f.write(b"here</a>.</small></body>\n</html>\n")
         length = f.tell()
         f.seek(0)
         self.send_response(200)
@@ -83,7 +78,7 @@ class SimpleHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
         if f:
             self.copyfile(f, self.wfile)
             f.close()
-        
+
     def deal_post_data(self):
         content_type = self.headers['content-type']
         if not content_type:
@@ -109,7 +104,7 @@ class SimpleHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
             out = open(fn, 'wb')
         except IOError:
             return (False, "Can't create file to write, do you have permission to write?")
-                
+
         preline = self.rfile.readline()
         remainbytes -= len(preline)
         while remainbytes > 0:
@@ -126,7 +121,7 @@ class SimpleHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
                 out.write(preline)
                 preline = line
         return (False, "Unexpect Ends of data.")
- 
+
     def send_head(self):
         """Common code for GET and HEAD commands.
 
@@ -170,7 +165,7 @@ class SimpleHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
         self.send_header("Last-Modified", self.date_time_string(fs.st_mtime))
         self.end_headers()
         return f
- 
+
     def list_directory(self, path):
         """Helper to produce a directory listing (absent index.html).
 
@@ -186,14 +181,14 @@ class SimpleHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
             return None
         list.sort(key=lambda a: a.lower())
         f = BytesIO()
-        displaypath = cgi.escape(urllib.parse.unquote(self.path))
+        displaypath = html.escape(urllib.parse.unquote(self.path))
         f.write(b'<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">')
-        f.write(("<html>\n<title>Directory listing for %s</title>\n" % displaypath).encode())
-        f.write(("<body>\n<h2>Directory listing for %s</h2>\n" % displaypath).encode())
+        f.write(("<html>\n<title>Liste des fichiers de %s</title>\n" % displaypath).encode())
+        f.write(("<body>\n<h2>Liste des fichiers de %s</h2>\n" % displaypath).encode())
         f.write(b"<hr>\n")
         f.write(b"<form ENCTYPE=\"multipart/form-data\" method=\"post\">")
         f.write(b"<input name=\"file\" type=\"file\"/>")
-        f.write(b"<input type=\"submit\" value=\"upload\"/></form>\n")
+        f.write(b"<input type=\"submit\" value=\"mettre en ligne\"/></form>\n")
         f.write(b"<hr>\n<ul>\n")
         for name in list:
             fullname = os.path.join(path, name)
@@ -206,7 +201,7 @@ class SimpleHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
                 displayname = name + "@"
                 # Note: a link to a directory displays with @ and links with /
             f.write(('<li><a href="%s">%s</a>\n'
-                    % (urllib.parse.quote(linkname), cgi.escape(displayname))).encode())
+                    % (urllib.parse.quote(linkname), html.escape(displayname))).encode())
         f.write(b"</ul>\n<hr>\n</body>\n</html>\n")
         length = f.tell()
         f.seek(0)
@@ -215,7 +210,7 @@ class SimpleHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(length))
         self.end_headers()
         return f
- 
+
     def translate_path(self, path):
         """Translate a /-separated PATH to the local filename syntax.
 
@@ -237,7 +232,7 @@ class SimpleHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
             if word in (os.curdir, os.pardir): continue
             path = os.path.join(path, word)
         return path
- 
+
     def copyfile(self, source, outputfile):
         """Copy all data between two file objects.
 
@@ -253,7 +248,7 @@ class SimpleHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
 
         """
         shutil.copyfileobj(source, outputfile)
- 
+
     def guess_type(self, path):
         """Guess the type of a file.
 
@@ -268,7 +263,7 @@ class SimpleHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
         slow) to look inside the data to make a better guess.
 
         """
- 
+
         base, ext = posixpath.splitext(path)
         if ext in self.extensions_map:
             return self.extensions_map[ext]
@@ -277,7 +272,7 @@ class SimpleHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
             return self.extensions_map[ext]
         else:
             return self.extensions_map['']
- 
+
     if not mimetypes.inited:
         mimetypes.init() # try to read system mime.types
     extensions_map = mimetypes.types_map.copy()
@@ -287,21 +282,20 @@ class SimpleHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
         '.c': 'text/plain',
         '.h': 'text/plain',
         })
- 
- 
+
 def test(HandlerClass = SimpleHTTPRequestHandler,
          ServerClass = http.server.HTTPServer):
     host_name = socket.gethostname()
     host_ip = socket.gethostbyname(host_name)
-    host_ip = str(host_ip)
-    local_ip_address = "http://" + host_ip + ":8000/"
-    #local_ip_address = local_ip_address.join("")
+    local_ip_address = "http://" + host_ip + ":3450/"
     local_ip_address = str(local_ip_address)
     local_ip_address = local_ip_address.replace(" ","")
-    print("Press CTRL + C to stop\n")
-    print("Can be accessed from the local network via <<  ",local_ip_address,"  >>\n")
-    print("Local address:")
-    http.server.test(HandlerClass, ServerClass)
- 
+    print("Pressez CTRL + C pour arrêter\n")
+    print("Accessible par le réseau local avec <<  ",local_ip_address,"  >>\n")
+    server_address = ('', 3450)
+    httpd = ServerClass(server_address, HandlerClass)
+    httpd.serve_forever()
+
+
 if __name__ == '__main__':
     test()
